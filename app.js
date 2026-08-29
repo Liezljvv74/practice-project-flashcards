@@ -6,6 +6,9 @@
 
   var STORAGE_KEY = 'flashcards.deck.v1';
 
+  // How long the green "Correct!" block stays up before the next card.
+  var CORRECT_PAUSE_MS = 1000;
+
   var STATUS_LABEL = {
     new: 'Not reviewed',
     known: 'Known',
@@ -24,8 +27,11 @@
     flipped: false,
     known: 0,
     learning: 0,
+    correct: 0,
     answerState: 'idle'
   };
+
+  var correctTimer = null;   // pending auto-advance after a correct answer
 
   /* ---- Elements ---- */
 
@@ -289,9 +295,18 @@
     return findCard(review.order[review.index]);
   }
 
+  function clearCorrectTimer() {
+    if (correctTimer !== null) {
+      window.clearTimeout(correctTimer);
+      correctTimer = null;
+    }
+  }
+
   function startReview() {
     if (!deck.length) return;
+    clearCorrectTimer();
     review.active = true;
+    review.correct = 0;
     review.order = deck.map(function (c) {
       return c.id;
     });
@@ -339,7 +354,9 @@
     answerRetry.hidden = state !== 'wrong';
 
     if (state === 'correct') {
-      answerMessage.textContent = 'Correct!';
+      answerMessage.textContent = review.index >= review.order.length - 1
+        ? 'Correct! That was the last card.'
+        : 'Correct! Moving to the next card...';
     } else if (state === 'wrong') {
       answerMessage.textContent = 'Do you want to try again?';
     } else if (state === 'revealed') {
@@ -362,11 +379,33 @@
     if (normalize(guess) === normalize(card.answer)) {
       review.answerState = 'correct';
       review.flipped = true;   // they earned the answer side
-    } else {
-      review.answerState = 'wrong';
+      review.correct++;
+      renderReview();
+      // Hold the green block long enough to read, then move on.
+      clearCorrectTimer();
+      correctTimer = window.setTimeout(advanceAfterCorrect, CORRECT_PAUSE_MS);
+      return;
     }
+
+    review.answerState = 'wrong';
     renderReview();
   });
+
+  function advanceAfterCorrect() {
+    correctTimer = null;
+    if (!review.active || review.answerState !== 'correct') return;
+
+    if (review.index < review.order.length - 1) {
+      goTo(review.index + 1);
+      return;
+    }
+
+    // That was the last card, so finish the run.
+    review.index++;
+    review.flipped = false;
+    resetAnswer();
+    renderReview();
+  }
 
   el('retry-yes').addEventListener('click', function () {
     resetAnswer();
@@ -381,6 +420,7 @@
   });
 
   function exitReview() {
+    clearCorrectTimer();
     review.active = false;
     reviewEl.hidden = true;
     renderDeck();
@@ -395,6 +435,7 @@
       reviewDone.hidden = false;
       reviewProgress.textContent = 'Done';
       reviewSummary.textContent =
+        'You answered ' + review.correct + ' correctly. ' +
         'You marked ' + review.known + ' as known and ' +
         review.learning + ' as still learning.';
       return;
@@ -415,6 +456,7 @@
   // card fresh: question side up, answer box empty.
   function goTo(index) {
     if (index < 0 || index >= review.order.length) return;
+    clearCorrectTimer();
     review.index = index;
     review.flipped = false;
     resetAnswer();
@@ -432,6 +474,7 @@
     var card = currentCard();
     if (!card) return;
 
+    clearCorrectTimer();
     card.status = status;
     if (status === 'known') review.known++;
     else review.learning++;
