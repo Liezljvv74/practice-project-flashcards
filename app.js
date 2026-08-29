@@ -322,33 +322,45 @@
 
   /* --- answer matching (pure functions, kept together for testing) --- */
 
-  // Punctuation clinging to the outside of a word. Deliberately a fixed
-  // list rather than \W, so accented letters survive: a \W-based strip
-  // would turn "cafe" with an accent into "caf".
-  var EDGE_PUNCTUATION = /^[.,!?;:'"()\[\]{}\-]+|[.,!?;:'"()\[\]{}\-]+$/g;
+  // Everything treated as punctuation. Deliberately a fixed list rather
+  // than \W, so accented letters survive: a \W-based strip would turn
+  // "cafe" with an accent into "caf".
+  var PUNCTUATION = /['‘’"“”.,;:!?()\[\]{}\/\\&+–—\-]/g;
+
+  // Ignored when comparing, so a list written "a, b and c" matches the
+  // same list written "a, b, c" or "a b c".
+  var FILLER_WORDS = ['and'];
 
   // Break text into a sorted list of bare words. Sorting is what makes
   // word order irrelevant; splitting on /\s+/ makes spacing irrelevant.
-  function answerWords(text) {
+  function answerWords(text, punctuationBecomes) {
     return String(text)
       .toLowerCase()
+      .replace(PUNCTUATION, punctuationBecomes)
       .split(/\s+/)
-      .map(function (word) {
-        return word.replace(EDGE_PUNCTUATION, '');
-      })
       .filter(function (word) {
-        return word.length > 0;
+        return word.length > 0 && FILLER_WORDS.indexOf(word) === -1;
       })
       .sort();
   }
 
-  // Correct when the guess holds exactly the same words as the answer.
-  // Any order, any spacing, any capitals - but every word must be
-  // there, and no extras.
+  function sameWords(guess, answer, punctuationBecomes) {
+    var typed = answerWords(guess, punctuationBecomes);
+    var wanted = answerWords(answer, punctuationBecomes);
+    return typed.length > 0 &&
+      typed.length === wanted.length &&
+      typed.join(' ') === wanted.join(' ');
+  }
+
+  // Correct when the guess holds the same words as the answer: any
+  // order, any spacing, any capitals, any punctuation - but every word
+  // must be there and there may be no extras.
+  //
+  // Punctuation is read two ways and either reading counts. Treated as
+  // a gap it lets "well-known" match "well known"; treated as nothing
+  // it lets "U.S.A." match "USA".
   function isCorrect(guess, answer) {
-    var typed = answerWords(guess);
-    var wanted = answerWords(answer);
-    return typed.length === wanted.length && typed.join(' ') === wanted.join(' ');
+    return sameWords(guess, answer, ' ') || sameWords(guess, answer, '');
   }
 
   /* --- end answer matching --- */
