@@ -250,6 +250,10 @@ input[type="search"]:focus {
   color: var(--danger);
 }
 
+.auto-result.is-busy {
+  color: var(--ink-soft);
+}
+
 /* ---- Toolbar ---- */
 
 /* Sits on the page background, with no panel around it. */

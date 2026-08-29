@@ -580,9 +580,10 @@
 
   /* --- end card parsing --- */
 
-  function showAutoResult(message, ok) {
+  // state is 'ok', 'bad' or 'busy'.
+  function showAutoResult(message, state) {
     autoResult.textContent = message;
-    autoResult.className = 'auto-result ' + (ok ? 'is-ok' : 'is-bad');
+    autoResult.className = 'auto-result is-' + state;
     autoResult.hidden = false;
   }
 
@@ -597,7 +598,7 @@
       showAutoResult(
         'No cards found in that file. Each row needs a question and an answer, ' +
         'separated by a comma, a tab, a pipe or " - ".',
-        false
+        'bad'
       );
       return;
     }
@@ -623,7 +624,7 @@
       (result.skipped
         ? ', and skipped ' + plural(result.skipped, 'line') + ' with no question and answer'
         : '') + '.',
-      true
+      'ok'
     );
   }
 
@@ -632,12 +633,13 @@
     autoFile.click();
   });
 
-  // Formats that are not plain text. Reading one with FileReader gives
-  // back compressed rubbish, so refuse it with an explanation instead
-  // of letting the parser find nothing and blame the file's layout.
-  var BINARY_FORMATS = {
-    doc: 'Word', docx: 'Word', odt: 'OpenDocument', rtf: 'Rich Text',
-    pages: 'Pages', pdf: 'PDF', xls: 'Excel', xlsx: 'Excel',
+  var PDFJS_VERSION = '3.11.174';
+
+  // Formats with no reader here. Word 97-2003 .doc is an older, wholly
+  // different format from .docx, and no browser library reads it.
+  var UNREADABLE_FORMATS = {
+    doc: 'Word 97-2003', odt: 'OpenDocument', rtf: 'Rich Text',
+    pages: 'Pages', xls: 'Excel', xlsx: 'Excel',
     ppt: 'PowerPoint', pptx: 'PowerPoint', key: 'Keynote'
   };
 
@@ -646,29 +648,167 @@
     return dot === -1 ? '' : String(name).slice(dot + 1).toLowerCase();
   }
 
+  function readAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('That file could not be opened.')); };
+      reader.readAsText(file);
+    });
+  }
+
+  function readAsArrayBuffer(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('That file could not be opened.')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function missingReader(what) {
+    return new Error(
+      'The ' + what + ' reader did not load. It comes from the internet rather ' +
+      'than living in this project, so check the connection and reload the page.'
+    );
+  }
+
+  /* ---- PDF ---- */
+
+  // pdf.js hands back positioned text fragments with no line breaks in
+  // them. The parser works a line at a time, so group the fragments by
+  // their vertical position to rebuild the lines.
+  function pdfTextToLines(content) {
+    var lines = [];
+    var current = null;
+    var lastY = null;
+
+    content.items.forEach(function (item) {
+      var y = Math.round(item.transform[5]);
+      if (lastY === null || Math.abs(y - lastY) > 2) {
+        current = [];
+        lines.push(current);
+        lastY = y;
+      }
+      current.push(item.str);
+    });
+
+    return lines.map(function (parts) {
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }).join('\n');
+  }
+
+  function readPdfPage(pdf, number, pages) {
+    return function () {
+      return pdf.getPage(number)
+        .then(function (page) {
+          return page.getTextContent();
+        })
+        .then(function (content) {
+          pages.push(pdfTextToLines(content));
+        });
+    };
+  }
+
+  function readPdf(file) {
+    if (!window.pdfjsLib) return Promise.reject(missingReader('PDF'));
+
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VERSION + '/pdf.worker.min.js';
+
+    return readAsArrayBuffer(file)
+      .then(function (buffer) {
+        return window.pdfjsLib.getDocument({ data: buffer }).promise;
+      })
+      .then(function (pdf) {
+        var pages = [];
+        var chain = Promise.resolve();
+        var number;
+
+        // One page at a time, so the pages stay in order.
+        for (number = 1; number <= pdf.numPages; number++) {
+          chain = chain.then(readPdfPage(pdf, number, pages));
+        }
+
+        return chain.then(function () {
+          return pages.join('\n');
+        });
+      });
+  }
+
+  /* ---- Word (.docx) ---- */
+
+  // A table is the natural way to write cards in Word, so convert to
+  // HTML and turn each row into "cell | cell". Taking raw text instead
+  // would lose which cell was which and leave every row unusable.
+  function docxHtmlToLines(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var lines = [];
+    var each = Array.prototype.forEach;
+
+    each.call(doc.querySelectorAll('tr'), function (row) {
+      var cells = Array.prototype.map.call(row.querySelectorAll('th, td'), function (cell) {
+        return cell.textContent.trim();
+      });
+      if (cells.length) lines.push(cells.join(' | '));
+    });
+
+    each.call(doc.querySelectorAll('table'), function (table) {
+      table.parentNode.removeChild(table);
+    });
+
+    each.call(doc.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6'), function (node) {
+      var text = node.textContent.trim();
+      if (text) lines.push(text);
+    });
+
+    return lines.join('\n');
+  }
+
+  function readDocx(file) {
+    if (!window.mammoth) return Promise.reject(missingReader('Word'));
+
+    return readAsArrayBuffer(file)
+      .then(function (buffer) {
+        return window.mammoth.convertToHtml({ arrayBuffer: buffer });
+      })
+      .then(function (result) {
+        return docxHtmlToLines(result.value);
+      });
+  }
+
+  function readFileForCards(file) {
+    var extension = extensionOf(file.name);
+
+    if (UNREADABLE_FORMATS[extension]) {
+      return Promise.reject(new Error(
+        'A .' + extension + ' file cannot be read here: ' + UNREADABLE_FORMATS[extension] +
+        ' files are not plain text and there is no reader for them. Open it, choose ' +
+        'Save as, pick Word (.docx), Plain Text (.txt) or CSV, and load that instead.'
+      ));
+    }
+
+    if (extension === 'pdf') return readPdf(file);
+    if (extension === 'docx') return readDocx(file);
+    return readAsText(file);
+  }
+
   autoFile.addEventListener('change', function () {
     var file = autoFile.files && autoFile.files[0];
     if (!file) return;
 
-    var extension = extensionOf(file.name);
-    if (BINARY_FORMATS[extension]) {
-      showAutoResult(
-        'A .' + extension + ' file cannot be read here: ' + BINARY_FORMATS[extension] +
-        ' documents are not plain text. Open it, choose Save as or Export, ' +
-        'pick Plain Text (.txt) or CSV, and load that instead.',
-        false
-      );
-      return;
-    }
+    showAutoResult('Reading ' + file.name + '...', 'busy');
 
-    var reader = new FileReader();
-    reader.onload = function () {
-      autoCreateFromText(reader.result);
-    };
-    reader.onerror = function () {
-      showAutoResult('That file could not be opened.', false);
-    };
-    reader.readAsText(file);
+    readFileForCards(file)
+      .then(function (text) {
+        autoCreateFromText(text);
+      })
+      .catch(function (error) {
+        showAutoResult(
+          error && error.message ? error.message : 'That file could not be read.',
+          'bad'
+        );
+      });
   });
 
   /* ---- Search ---- */
