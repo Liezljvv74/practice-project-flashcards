@@ -53,7 +53,7 @@
   var reviewEl = el('review');
   var reviewChoice = el('review-choice');
   var chooseAllBtn = el('choose-all');
-  var chooseLearningBtn = el('choose-learning');
+  var choosePendingBtn = el('choose-pending');
   var choiceNote = el('choice-note');
   var reviewStage = el('review-stage');
   var reviewDone = el('review-done');
@@ -307,9 +307,10 @@
     }
   }
 
-  function learningCards() {
+  // Everything not yet settled: still learning, plus never reviewed.
+  function pendingCards() {
     return deck.filter(function (c) {
-      return c.status === 'learning';
+      return c.status !== 'known';
     });
   }
 
@@ -324,9 +325,9 @@
     renderReview();
   }
 
-  // scope is 'all' or 'learning'.
+  // scope is 'all' or 'pending'.
   function beginReview(scope) {
-    var cards = scope === 'learning' ? learningCards() : deck;
+    var cards = scope === 'pending' ? pendingCards() : deck;
     if (!cards.length) return;
 
     clearCorrectTimer();
@@ -501,15 +502,17 @@
   }
 
   function renderChoice() {
-    var learning = learningCards().length;
+    var pending = pendingCards().length;
 
     reviewProgress.textContent = '';
     chooseAllBtn.textContent = 'Review all (' + deck.length + ')';
-    chooseLearningBtn.textContent = 'Review "still learning" only (' + learning + ')';
-    chooseLearningBtn.disabled = learning === 0;
-    choiceNote.textContent = learning === 0
-      ? 'No cards are marked "still learning" yet, so there is nothing to narrow down to.'
-      : learning + ' of ' + deck.length + ' cards are marked "still learning".';
+    choosePendingBtn.textContent =
+      'Review "still learning" and "not reviewed" only (' + pending + ')';
+    choosePendingBtn.disabled = pending === 0;
+    choiceNote.textContent = pending === 0
+      ? 'Every card is marked known, so there is nothing left to narrow down to.'
+      : pending + ' of ' + deck.length +
+        ' cards are still learning or not reviewed yet.';
     chooseAllBtn.focus();
   }
 
@@ -595,8 +598,8 @@
   chooseAllBtn.addEventListener('click', function () {
     beginReview('all');
   });
-  chooseLearningBtn.addEventListener('click', function () {
-    beginReview('learning');
+  choosePendingBtn.addEventListener('click', function () {
+    beginReview('pending');
   });
   el('mark-known').addEventListener('click', function () {
     mark('known');
