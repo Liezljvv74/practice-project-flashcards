@@ -1,6 +1,6 @@
 # Flashcards
 
-A small study tool. Users create question/answer cards, flip them in review mode, and mark each card as known or unknown.
+A small study tool. Users create question/answer cards, then review them one at a time: type an answer to check it, flip the card, and mark it as known or still learning.
 
 ## Stack
 

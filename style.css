@@ -11,6 +11,10 @@
   --known: #1f7a4d;
   --learning: #9a5b00;
   --danger: #b3261e;
+  --correct: #1f7a4d;
+  --correct-bg: #dcf0e5;
+  --wrong: #b3261e;
+  --wrong-bg: #fbe4e2;
   --radius: 10px;
 }
 
@@ -297,10 +301,20 @@ input[type="text"]:focus {
 
 .review-box {
   width: 100%;
-  max-width: 560px;
+  max-width: 900px;
+  max-height: 100%;
+  overflow-y: auto;
   background: var(--panel);
   border-radius: var(--radius);
   padding: 20px;
+}
+
+/* Flashcard on the left, answer block on the right. */
+.review-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
 }
 
 .review-head {
@@ -365,6 +379,71 @@ input[type="text"]:focus {
   color: var(--ink-soft);
 }
 
+/* ---- Answer block ---- */
+
+.answer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: #fbfcfd;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.answer-block.is-correct {
+  background: var(--correct-bg);
+  border-color: var(--correct);
+}
+
+.answer-block.is-wrong {
+  background: var(--wrong-bg);
+  border-color: var(--wrong);
+}
+
+/* These use display:flex, so the plain [hidden] rule needs help. */
+.answer-form[hidden],
+.answer-feedback[hidden],
+.answer-retry[hidden] {
+  display: none;
+}
+
+.answer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.answer-message {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.answer-block.is-correct .answer-message {
+  color: var(--correct);
+}
+
+.answer-block.is-wrong .answer-message {
+  color: var(--wrong);
+}
+
+.answer-retry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.answer-retry .btn {
+  background: #fff;
+}
+
 .review-actions {
   display: flex;
   flex-wrap: wrap;
@@ -381,6 +460,17 @@ input[type="text"]:focus {
 }
 
 /* ---- Small screens ---- */
+
+/* Stack the answer block under the card when there is no room beside it. */
+@media (max-width: 720px) {
+  .review-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .flashcard {
+    min-height: 150px;
+  }
+}
 
 @media (max-width: 520px) {
   body {
@@ -407,5 +497,13 @@ input[type="text"]:focus {
 
   .flashcard-text {
     font-size: 19px;
+  }
+
+  .answer-block {
+    padding: 16px;
+  }
+
+  .answer-retry .btn {
+    width: 100%;
   }
 }

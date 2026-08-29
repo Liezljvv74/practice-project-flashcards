@@ -16,7 +16,16 @@
 
   var deck = [];          // [{ id, question, answer, status }]
   var editingId = null;   // card currently being edited in place
-  var review = { active: false, order: [], index: 0, flipped: false, known: 0, learning: 0 };
+  // answerState: 'idle' | 'correct' | 'wrong' | 'revealed'
+  var review = {
+    active: false,
+    order: [],
+    index: 0,
+    flipped: false,
+    known: 0,
+    learning: 0,
+    answerState: 'idle'
+  };
 
   /* ---- Elements ---- */
 
@@ -42,6 +51,13 @@
   var flashcardEl = el('flashcard');
   var flashcardSide = el('flashcard-side');
   var flashcardText = el('flashcard-text');
+
+  var answerBlock = el('answer-block');
+  var answerForm = el('answer-form');
+  var answerGuess = el('answer-guess');
+  var answerFeedback = el('answer-feedback');
+  var answerMessage = el('answer-message');
+  var answerRetry = el('answer-retry');
 
   /* ---- Storage ---- */
 
@@ -280,9 +296,86 @@
     review.flipped = false;
     review.known = 0;
     review.learning = 0;
+    resetAnswer();
     reviewEl.hidden = false;
     renderReview();
+    focusAnswer();
   }
+
+  /* ---- Typed answer ---- */
+
+  // Forgiving comparison: case, outer spaces, doubled spaces and a
+  // trailing full stop should not fail an otherwise correct answer.
+  function normalize(text) {
+    return text
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[.,!?;:]+$/, '');
+  }
+
+  function resetAnswer() {
+    review.answerState = 'idle';
+    answerGuess.value = '';
+  }
+
+  function focusAnswer() {
+    if (review.active && review.answerState === 'idle' && currentCard()) {
+      answerGuess.focus();
+    }
+  }
+
+  function renderAnswerBlock(card) {
+    var state = review.answerState;
+
+    answerBlock.classList.toggle('is-correct', state === 'correct');
+    answerBlock.classList.toggle('is-wrong', state === 'wrong' || state === 'revealed');
+
+    answerForm.hidden = state !== 'idle';
+    answerFeedback.hidden = state === 'idle';
+    answerRetry.hidden = state !== 'wrong';
+
+    if (state === 'correct') {
+      answerMessage.textContent = 'Correct!';
+    } else if (state === 'wrong') {
+      answerMessage.textContent = 'Do you want to try again?';
+    } else if (state === 'revealed') {
+      answerMessage.textContent = 'The correct answer is: ' + card.answer;
+    }
+  }
+
+  answerForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+
+    var card = currentCard();
+    if (!card) return;
+
+    var guess = answerGuess.value.trim();
+    if (!guess) {
+      answerGuess.focus();
+      return;
+    }
+
+    if (normalize(guess) === normalize(card.answer)) {
+      review.answerState = 'correct';
+      review.flipped = true;   // they earned the answer side
+    } else {
+      review.answerState = 'wrong';
+    }
+    renderReview();
+  });
+
+  el('retry-yes').addEventListener('click', function () {
+    resetAnswer();
+    renderReview();
+    focusAnswer();
+  });
+
+  el('retry-show').addEventListener('click', function () {
+    review.answerState = 'revealed';
+    review.flipped = true;
+    renderReview();
+  });
 
   function exitReview() {
     review.active = false;
@@ -310,7 +403,7 @@
     flashcardSide.textContent = review.flipped ? 'Answer' : 'Question';
     flashcardText.textContent = review.flipped ? card.answer : card.question;
     flashcardEl.classList.toggle('is-flipped', review.flipped);
-    flashcardEl.focus();
+    renderAnswerBlock(card);
   }
 
   function flip() {
@@ -330,7 +423,9 @@
 
     review.index++;
     review.flipped = false;
+    resetAnswer();
     renderReview();
+    focusAnswer();
   }
 
   startReviewBtn.addEventListener('click', startReview);
@@ -352,6 +447,11 @@
       exitReview();
       return;
     }
+
+    // While the answer box has focus, let every key type normally -
+    // otherwise Space, K and L could never be part of an answer.
+    if (event.target && event.target.tagName === 'INPUT') return;
+
     if (!reviewDone.hidden) return;
 
     if (event.key === ' ' || event.key === 'Spacebar') {

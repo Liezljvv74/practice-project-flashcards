@@ -57,11 +57,33 @@
       </div>
 
       <div id="review-stage">
-        <div id="flashcard" class="flashcard" role="button" tabindex="0"
-             aria-label="Flashcard. Press space to flip.">
-          <span id="flashcard-side" class="flashcard-side">Question</span>
-          <span id="flashcard-text" class="flashcard-text"></span>
-          <span class="flashcard-hint">Click the card or press Space to flip</span>
+
+        <div class="review-cols">
+
+          <div id="flashcard" class="flashcard" role="button" tabindex="0"
+               aria-label="Flashcard. Press space to flip.">
+            <span id="flashcard-side" class="flashcard-side">Question</span>
+            <span id="flashcard-text" class="flashcard-text"></span>
+            <span class="flashcard-hint">Click the card to flip</span>
+          </div>
+
+          <div id="answer-block" class="answer-block">
+            <form id="answer-form" class="answer-form" novalidate>
+              <label for="answer-guess">Your answer</label>
+              <input id="answer-guess" type="text" autocomplete="off"
+                     placeholder="Type the answer">
+              <button type="submit" class="btn btn-primary">Check</button>
+            </form>
+
+            <div id="answer-feedback" class="answer-feedback" role="status" hidden>
+              <p id="answer-message" class="answer-message"></p>
+              <div id="answer-retry" class="answer-retry" hidden>
+                <button type="button" id="retry-yes" class="btn btn-small">Yes</button>
+                <button type="button" id="retry-show" class="btn btn-small">No, show me the correct answer</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <div class="review-actions">
