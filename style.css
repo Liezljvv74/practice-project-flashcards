@@ -1,1 +1,411 @@
-/* Flashcards styles */
+/* ---- Base ---- */
+
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --ink: #1c2024;
+  --ink-soft: #5b6570;
+  --line: #d8dce1;
+  --accent: #2f5fd0;
+  --accent-dark: #24499f;
+  --known: #1f7a4d;
+  --learning: #9a5b00;
+  --danger: #b3261e;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px 16px 64px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+h1, h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+/* ---- Layout ---- */
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.app-head {
+  margin-bottom: 24px;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.count {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+/* ---- Forms ---- */
+
+.add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+input[type="text"]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---- Buttons ---- */
+
+.btn {
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #eceff3;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #e0e4ea;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-dark);
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-known {
+  color: #fff;
+  background: var(--known);
+  border-color: var(--known);
+}
+
+.btn-learning {
+  color: #fff;
+  background: var(--learning);
+  border-color: var(--learning);
+}
+
+.btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+/* ---- Deck list ---- */
+
+.empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #fbfcfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.card-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.card-q {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.card-a {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.card-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.badge {
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: #e8ebef;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.badge-known {
+  background: #dcf0e5;
+  color: var(--known);
+}
+
+.badge-learning {
+  background: #fbeacf;
+  color: var(--learning);
+}
+
+/* ---- Edit in place ---- */
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.edit-form .edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- Review mode ---- */
+
+.review {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(20, 24, 30, 0.75);
+}
+
+.review[hidden] {
+  display: none;
+}
+
+.review-box {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.review-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.review-progress {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.flashcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  padding: 24px 20px;
+  text-align: center;
+  background: #fbfcfd;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  user-select: none;
+}
+
+.flashcard:hover {
+  border-color: var(--accent);
+}
+
+.flashcard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.flashcard-side {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.flashcard.is-flipped .flashcard-side {
+  color: var(--accent);
+}
+
+.flashcard-text {
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.flashcard-hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.review-actions .btn {
+  flex: 1 1 140px;
+}
+
+.review-done p {
+  color: var(--ink-soft);
+}
+
+/* ---- Small screens ---- */
+
+@media (max-width: 520px) {
+  body {
+    padding: 16px 12px 48px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .add-form .btn-primary,
+  .panel-head .btn {
+    width: 100%;
+  }
+
+  .card-side {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .flashcard-text {
+    font-size: 19px;
+  }
+}

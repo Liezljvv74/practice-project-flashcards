@@ -7,7 +7,81 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Flashcards</h1>
+
+  <div class="app">
+
+    <header class="app-head">
+      <h1>Flashcards</h1>
+      <p class="subtitle">Write your cards, then review them one at a time.</p>
+    </header>
+
+    <section class="panel" aria-labelledby="add-heading">
+      <h2 id="add-heading">Add a card</h2>
+
+      <form id="add-form" class="add-form" novalidate>
+        <div class="field">
+          <label for="question-input">Question</label>
+          <input id="question-input" type="text" autocomplete="off"
+                 placeholder="What is the capital of France?">
+        </div>
+        <div class="field">
+          <label for="answer-input">Answer</label>
+          <input id="answer-input" type="text" autocomplete="off"
+                 placeholder="Paris">
+        </div>
+        <button type="submit" class="btn btn-primary">Add card</button>
+      </form>
+
+      <p id="add-error" class="error" role="alert" hidden></p>
+    </section>
+
+    <section class="panel" aria-labelledby="deck-heading">
+      <div class="panel-head">
+        <h2 id="deck-heading">Your deck <span id="deck-count" class="count"></span></h2>
+        <button type="button" id="start-review" class="btn btn-primary">Start review</button>
+      </div>
+
+      <p id="empty-state" class="empty">No cards yet. Add your first one above.</p>
+      <ul id="card-list" class="card-list"></ul>
+    </section>
+
+  </div>
+
+  <!-- Review mode -->
+  <div id="review" class="review" role="dialog" aria-modal="true" aria-label="Review mode" hidden>
+    <div class="review-box">
+
+      <div class="review-head">
+        <span id="review-progress" class="review-progress"></span>
+        <button type="button" id="exit-review" class="btn btn-quiet">Exit review</button>
+      </div>
+
+      <div id="review-stage">
+        <div id="flashcard" class="flashcard" role="button" tabindex="0"
+             aria-label="Flashcard. Press space to flip.">
+          <span id="flashcard-side" class="flashcard-side">Question</span>
+          <span id="flashcard-text" class="flashcard-text"></span>
+          <span class="flashcard-hint">Click the card or press Space to flip</span>
+        </div>
+
+        <div class="review-actions">
+          <button type="button" id="mark-learning" class="btn btn-learning">Still learning</button>
+          <button type="button" id="mark-known" class="btn btn-known">Known</button>
+        </div>
+      </div>
+
+      <div id="review-done" class="review-done" hidden>
+        <h2>Review finished</h2>
+        <p id="review-summary"></p>
+        <div class="review-actions">
+          <button type="button" id="review-again" class="btn">Review again</button>
+          <button type="button" id="review-close" class="btn btn-primary">Back to deck</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
