@@ -447,12 +447,30 @@
     });
   }
 
+  // Markdown furniture: headings, horizontal rules, and the dashed row
+  // under a table header. Not cards, but not mistakes either, so these
+  // are ignored rather than counted as skipped.
+  var MARKDOWN_FURNITURE = /^(#{1,6}\s|={3,}$|-{3,}$|\*{3,}$|_{3,}$|\|?[\s\-:|]+\|?$)/;
+
+  // A bullet or number at the start of a line, so "- term | meaning"
+  // reads as a card rather than a card whose question starts with "-".
+  var LIST_MARKER = /^(\s*[-*+]\s+|\s*\d+[.)]\s+)/;
+
+  // A markdown table row arrives as "| a | b |", which splits into an
+  // empty field at each end. Drop those so the columns line up.
+  function splitOnPipes(line) {
+    var parts = trimAll(line.split('|'));
+    if (parts.length && parts[0] === '') parts.shift();
+    if (parts.length && parts[parts.length - 1] === '') parts.pop();
+    return parts;
+  }
+
   // Split one line into columns. Tabs and pipes are unambiguous, so
   // they win; commas need the CSV reader; " - " is tried last because a
   // bare hyphen turns up inside ordinary words.
   function splitLine(line) {
     if (line.indexOf('\t') !== -1) return trimAll(line.split('\t'));
-    if (line.indexOf('|') !== -1) return trimAll(line.split('|'));
+    if (line.indexOf('|') !== -1) return splitOnPipes(line);
 
     if (line.indexOf(',') !== -1) {
       var fields = parseCsvLine(line);
@@ -496,6 +514,10 @@
     lines.forEach(function (rawLine) {
       var line = rawLine.trim();
       if (!line) return;                       // blank lines are not failures
+      if (MARKDOWN_FURNITURE.test(line)) return;
+
+      line = line.replace(LIST_MARKER, '');
+      if (!line) return;
 
       // "A: ..." closes a question opened on an earlier line.
       var answered = line.match(/^a\s*[:.]\s*(.+)$/i);
@@ -610,9 +632,34 @@
     autoFile.click();
   });
 
+  // Formats that are not plain text. Reading one with FileReader gives
+  // back compressed rubbish, so refuse it with an explanation instead
+  // of letting the parser find nothing and blame the file's layout.
+  var BINARY_FORMATS = {
+    doc: 'Word', docx: 'Word', odt: 'OpenDocument', rtf: 'Rich Text',
+    pages: 'Pages', pdf: 'PDF', xls: 'Excel', xlsx: 'Excel',
+    ppt: 'PowerPoint', pptx: 'PowerPoint', key: 'Keynote'
+  };
+
+  function extensionOf(name) {
+    var dot = String(name).lastIndexOf('.');
+    return dot === -1 ? '' : String(name).slice(dot + 1).toLowerCase();
+  }
+
   autoFile.addEventListener('change', function () {
     var file = autoFile.files && autoFile.files[0];
     if (!file) return;
+
+    var extension = extensionOf(file.name);
+    if (BINARY_FORMATS[extension]) {
+      showAutoResult(
+        'A .' + extension + ' file cannot be read here: ' + BINARY_FORMATS[extension] +
+        ' documents are not plain text. Open it, choose Save as or Export, ' +
+        'pick Plain Text (.txt) or CSV, and load that instead.',
+        false
+      );
+      return;
+    }
 
     var reader = new FileReader();
     reader.onload = function () {
