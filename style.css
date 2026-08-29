@@ -51,7 +51,7 @@ h2 {
 }
 
 .app-head {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 /* Title on the left, file buttons on the right, tops level so the
@@ -217,11 +217,23 @@ input[type="search"]:focus {
 .toolbar {
   display: flex;
   flex-direction: column;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
+/* Label beside the box rather than above it. */
 .toolbar .field {
-  max-width: 340px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  max-width: 440px;
+}
+
+.toolbar .field label {
+  flex: 0 0 auto;
+}
+
+.toolbar .field input {
+  flex: 1 1 auto;
 }
 
 .toolbar-actions {
