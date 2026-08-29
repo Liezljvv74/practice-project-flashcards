@@ -9,6 +9,9 @@
   // How long the green "Correct!" block stays up before the next card.
   var CORRECT_PAUSE_MS = 1000;
 
+  // The most cards one Auto-create run may add.
+  var AUTO_CREATE_LIMIT = 20;
+
   var STATUS_LABEL = {
     new: 'Not reviewed',
     known: 'Known',
@@ -21,6 +24,7 @@
   var editingId = null;   // card currently being edited in place
   var selectedId = null;  // card the keyboard is pointing at
   var searchTerm = '';    // text typed into the search box
+  var lastAutoIds = [];   // ids added by the last Auto-create, for Undo
   // phase:       'choice' | 'card' | 'done'
   // answerState: 'idle' | 'correct' | 'wrong' | 'revealed'
   var review = {
@@ -50,7 +54,9 @@
   var searchInput = el('search-input');
   var importFile = el('import-file');
   var autoFile = el('auto-file');
+  var autoOutcome = el('auto-outcome');
   var autoResult = el('auto-result');
+  var autoUndo = el('auto-undo');
   var printArea = el('print-area');
 
   var deckCount = el('deck-count');
@@ -584,7 +590,11 @@
   function showAutoResult(message, state) {
     autoResult.textContent = message;
     autoResult.className = 'auto-result is-' + state;
-    autoResult.hidden = false;
+    autoOutcome.hidden = false;
+  }
+
+  function showUndo(canUndo) {
+    autoUndo.hidden = !canUndo;
   }
 
   function plural(count, word) {
@@ -595,6 +605,7 @@
     var result = parseCards(text);
 
     if (!result.cards.length) {
+      showUndo(false);
       showAutoResult(
         'No cards found in that file. Each row needs a question and an answer, ' +
         'separated by a comma, a tab, a pipe or " - ".',
@@ -603,13 +614,19 @@
       return;
     }
 
-    result.cards.forEach(function (card) {
+    var found = result.cards.length;
+    var taken = result.cards.slice(0, AUTO_CREATE_LIMIT);
+
+    // Remember this batch so Undo can lift exactly these cards back out.
+    lastAutoIds = taken.map(function (card) {
+      var id = makeId();
       deck.push({
-        id: makeId(),
+        id: id,
         question: card.question,
         answer: card.answer,
         status: card.status
       });
+      return id;
     });
 
     // Clear any search, or the new cards may be filtered out of sight.
@@ -619,14 +636,47 @@
     save();
     renderDeck();
 
-    showAutoResult(
-      'Added ' + plural(result.cards.length, 'card') +
-      (result.skipped
-        ? ', and skipped ' + plural(result.skipped, 'line') + ' with no question and answer'
-        : '') + '.',
-      'ok'
-    );
+    var message = 'Added ' + plural(taken.length, 'card') + '.';
+
+    if (found > AUTO_CREATE_LIMIT) {
+      message += ' That file held ' + found + ', and ' + AUTO_CREATE_LIMIT +
+        ' is the most that can be created at once, so the rest were left out.';
+    }
+    if (result.skipped) {
+      message += ' ' + plural(result.skipped, 'line') +
+        ' had no question and answer, so ' +
+        (result.skipped === 1 ? 'it was' : 'they were') + ' skipped.';
+    }
+
+    showUndo(true);
+    showAutoResult(message, 'ok');
   }
+
+  // Take back exactly the cards the last auto-create added. Any of them
+  // already deleted by hand are simply not there to remove.
+  function undoAutoCreate() {
+    if (!lastAutoIds.length) return;
+
+    var batch = lastAutoIds;
+    var before = deck.length;
+
+    deck = deck.filter(function (card) {
+      return batch.indexOf(card.id) === -1;
+    });
+
+    if (batch.indexOf(selectedId) !== -1) selectedId = null;
+    if (batch.indexOf(editingId) !== -1) editingId = null;
+
+    lastAutoIds = [];
+    save();
+    renderDeck();
+
+    showUndo(false);
+    showAutoResult('Removed the ' + plural(before - deck.length, 'card') +
+      ' that were just created.', 'ok');
+  }
+
+  autoUndo.addEventListener('click', undoAutoCreate);
 
   el('auto-create').addEventListener('click', function () {
     autoFile.value = '';   // so picking the same file twice still fires
@@ -940,6 +990,8 @@
     deck = imported;
     selectedId = null;
     editingId = null;
+    lastAutoIds = [];      // those cards are gone, so Undo has nothing to lift
+    showUndo(false);
     searchTerm = '';
     searchInput.value = '';
     save();
