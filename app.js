@@ -59,6 +59,9 @@
   var answerMessage = el('answer-message');
   var answerRetry = el('answer-retry');
 
+  var prevCardBtn = el('prev-card');
+  var nextCardBtn = el('next-card');
+
   /* ---- Storage ---- */
 
   function makeId() {
@@ -403,7 +406,20 @@
     flashcardSide.textContent = review.flipped ? 'Answer' : 'Question';
     flashcardText.textContent = review.flipped ? card.answer : card.question;
     flashcardEl.classList.toggle('is-flipped', review.flipped);
+    prevCardBtn.disabled = review.index === 0;
+    nextCardBtn.disabled = review.index >= review.order.length - 1;
     renderAnswerBlock(card);
+  }
+
+  // Move between cards without marking them. Each move starts the new
+  // card fresh: question side up, answer box empty.
+  function goTo(index) {
+    if (index < 0 || index >= review.order.length) return;
+    review.index = index;
+    review.flipped = false;
+    resetAnswer();
+    renderReview();
+    focusAnswer();
   }
 
   function flip() {
@@ -439,6 +455,13 @@
     mark('learning');
   });
   flashcardEl.addEventListener('click', flip);
+
+  prevCardBtn.addEventListener('click', function () {
+    goTo(review.index - 1);
+  });
+  nextCardBtn.addEventListener('click', function () {
+    goTo(review.index + 1);
+  });
 
   document.addEventListener('keydown', function (event) {
     if (!review.active) return;
