@@ -53,6 +53,16 @@
       </form>
 
       <p id="add-error" class="error" role="alert" hidden></p>
+
+      <div class="auto-create">
+        <p class="auto-hint">
+          Or build many at once from a file: two columns a row, question first.
+        </p>
+        <button type="button" id="auto-create" class="btn btn-small">Auto-create from a file</button>
+        <input type="file" id="auto-file" accept=".csv,text/csv" hidden>
+      </div>
+
+      <p id="auto-result" class="auto-result" role="status" hidden></p>
     </section>
 
     <section class="panel" aria-labelledby="deck-heading">

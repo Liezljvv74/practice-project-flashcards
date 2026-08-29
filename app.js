@@ -49,6 +49,8 @@
 
   var searchInput = el('search-input');
   var importFile = el('import-file');
+  var autoFile = el('auto-file');
+  var autoResult = el('auto-result');
   var printArea = el('print-area');
 
   var deckCount = el('deck-count');
@@ -395,6 +397,231 @@
     answerInput.value = '';
     questionInput.focus();
     renderDeck();
+  });
+
+  /* ---- Auto-create: turn a file into cards ---- */
+
+  /* --- card parsing (pure functions, kept together for testing) --- */
+
+  // A status label read back into the stored value, so a file this app
+  // exported keeps its statuses when it is read in again.
+  var STATUS_FROM_LABEL = {
+    'known': 'known',
+    'still learning': 'learning',
+    'not reviewed': 'new'
+  };
+
+  // One CSV line into fields, honouring quotes and doubled quotes, so a
+  // comma inside a question does not split it into two columns.
+  function parseCsvLine(line) {
+    var fields = [];
+    var current = '';
+    var inQuotes = false;
+    var i;
+
+    for (i = 0; i < line.length; i++) {
+      var ch = line.charAt(i);
+
+      if (inQuotes) {
+        if (ch !== '"') {
+          current += ch;
+        } else if (line.charAt(i + 1) === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        fields.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+
+    fields.push(current);
+    return fields.map(function (field) {
+      return field.trim();
+    });
+  }
+
+  // Split one line into columns. Tabs and pipes are unambiguous, so
+  // they win; commas need the CSV reader; " - " is tried last because a
+  // bare hyphen turns up inside ordinary words.
+  function splitLine(line) {
+    if (line.indexOf('\t') !== -1) return trimAll(line.split('\t'));
+    if (line.indexOf('|') !== -1) return trimAll(line.split('|'));
+
+    if (line.indexOf(',') !== -1) {
+      var fields = parseCsvLine(line);
+      if (fields.length >= 2) return fields;
+    }
+
+    var dashed = line.split(' - ');
+    if (dashed.length >= 2) {
+      return [dashed[0].trim(), dashed.slice(1).join(' - ').trim()];
+    }
+
+    return null;
+  }
+
+  function trimAll(parts) {
+    return parts.map(function (part) {
+      return part.trim();
+    });
+  }
+
+  function isHeaderRow(fields) {
+    return fields.length >= 2 &&
+      fields[0].toLowerCase() === 'question' &&
+      fields[1].toLowerCase() === 'answer';
+  }
+
+  function statusFromLabel(label) {
+    var key = label ? String(label).trim().toLowerCase() : '';
+    return STATUS_FROM_LABEL[key] || 'new';
+  }
+
+  // Read a whole file into { cards, skipped }. Cards carry no id yet;
+  // that is added when they join the deck.
+  function parseCards(text) {
+    var lines = String(text).split(/\r\n|\r|\n/);
+    var cards = [];
+    var skipped = 0;
+    var pendingQuestion = null;
+    var seenFirstRow = false;
+
+    lines.forEach(function (rawLine) {
+      var line = rawLine.trim();
+      if (!line) return;                       // blank lines are not failures
+
+      // "A: ..." closes a question opened on an earlier line.
+      var answered = line.match(/^a\s*[:.]\s*(.+)$/i);
+      if (answered) {
+        if (pendingQuestion) {
+          cards.push({
+            question: pendingQuestion,
+            answer: answered[1].trim(),
+            status: 'new'
+          });
+          pendingQuestion = null;
+        } else {
+          skipped++;                           // an answer with no question
+        }
+        return;
+      }
+
+      var asked = line.match(/^q\s*[:.]\s*(.+)$/i);
+      if (asked) {
+        if (pendingQuestion) skipped++;        // the one before was never answered
+        pendingQuestion = asked[1].trim();
+        return;
+      }
+
+      if (pendingQuestion) {                   // a question left hanging
+        skipped++;
+        pendingQuestion = null;
+      }
+
+      var fields = splitLine(line);
+      if (!fields) {
+        skipped++;
+        return;
+      }
+
+      if (!seenFirstRow && isHeaderRow(fields)) {
+        seenFirstRow = true;                   // column titles, not a card
+        return;
+      }
+      seenFirstRow = true;
+
+      var question = fields[0];
+      var answer = fields[1];
+      if (!question || !answer) {
+        skipped++;
+        return;
+      }
+
+      cards.push({
+        question: question,
+        answer: answer,
+        status: statusFromLabel(fields[2])
+      });
+    });
+
+    if (pendingQuestion) skipped++;
+
+    return { cards: cards, skipped: skipped };
+  }
+
+  /* --- end card parsing --- */
+
+  function showAutoResult(message, ok) {
+    autoResult.textContent = message;
+    autoResult.className = 'auto-result ' + (ok ? 'is-ok' : 'is-bad');
+    autoResult.hidden = false;
+  }
+
+  function plural(count, word) {
+    return count + ' ' + word + (count === 1 ? '' : 's');
+  }
+
+  function autoCreateFromText(text) {
+    var result = parseCards(text);
+
+    if (!result.cards.length) {
+      showAutoResult(
+        'No cards found in that file. Each row needs a question and an answer, ' +
+        'separated by a comma, a tab, a pipe or " - ".',
+        false
+      );
+      return;
+    }
+
+    result.cards.forEach(function (card) {
+      deck.push({
+        id: makeId(),
+        question: card.question,
+        answer: card.answer,
+        status: card.status
+      });
+    });
+
+    // Clear any search, or the new cards may be filtered out of sight.
+    searchTerm = '';
+    searchInput.value = '';
+
+    save();
+    renderDeck();
+
+    showAutoResult(
+      'Added ' + plural(result.cards.length, 'card') +
+      (result.skipped
+        ? ', and skipped ' + plural(result.skipped, 'line') + ' with no question and answer'
+        : '') + '.',
+      true
+    );
+  }
+
+  el('auto-create').addEventListener('click', function () {
+    autoFile.value = '';   // so picking the same file twice still fires
+    autoFile.click();
+  });
+
+  autoFile.addEventListener('change', function () {
+    var file = autoFile.files && autoFile.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      autoCreateFromText(reader.result);
+    };
+    reader.onerror = function () {
+      showAutoResult('That file could not be opened.', false);
+    };
+    reader.readAsText(file);
   });
 
   /* ---- Search ---- */
