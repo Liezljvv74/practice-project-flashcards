@@ -25,8 +25,7 @@
     order: [],
     index: 0,
     flipped: false,
-    known: 0,
-    learning: 0,
+    marks: {},          // card id -> status set during this run
     correct: 0,
     answerState: 'idle'
   };
@@ -312,8 +311,7 @@
     });
     review.index = 0;
     review.flipped = false;
-    review.known = 0;
-    review.learning = 0;
+    review.marks = {};
     resetAnswer();
     reviewEl.hidden = false;
     renderReview();
@@ -355,8 +353,8 @@
 
     if (state === 'correct') {
       answerMessage.textContent = review.index >= review.order.length - 1
-        ? 'Correct! That was the last card.'
-        : 'Correct! Moving to the next card...';
+        ? 'Correct! Marked as known. That was the last card.'
+        : 'Correct! Marked as known - moving to the next card...';
     } else if (state === 'wrong') {
       answerMessage.textContent = 'Do you want to try again?';
     } else if (state === 'revealed') {
@@ -380,6 +378,7 @@
       review.answerState = 'correct';
       review.flipped = true;   // they earned the answer side
       review.correct++;
+      recordMark(card, 'known');   // getting it right counts as knowing it
       renderReview();
       // Hold the green block long enough to read, then move on.
       clearCorrectTimer();
@@ -436,8 +435,8 @@
       reviewProgress.textContent = 'Done';
       reviewSummary.textContent =
         'You answered ' + review.correct + ' correctly. ' +
-        'You marked ' + review.known + ' as known and ' +
-        review.learning + ' as still learning.';
+        countMarks('known') + ' marked as known, ' +
+        countMarks('learning') + ' as still learning.';
       return;
     }
 
@@ -470,15 +469,28 @@
     renderReview();
   }
 
+  // Record a status against a card. Marking the same card twice in one
+  // run overwrites the earlier mark rather than counting it again.
+  function recordMark(card, status) {
+    card.status = status;
+    review.marks[card.id] = status;
+    save();
+  }
+
+  function countMarks(status) {
+    var total = 0;
+    Object.keys(review.marks).forEach(function (id) {
+      if (review.marks[id] === status) total++;
+    });
+    return total;
+  }
+
   function mark(status) {
     var card = currentCard();
     if (!card) return;
 
     clearCorrectTimer();
-    card.status = status;
-    if (status === 'known') review.known++;
-    else review.learning++;
-    save();
+    recordMark(card, status);
 
     review.index++;
     review.flipped = false;
