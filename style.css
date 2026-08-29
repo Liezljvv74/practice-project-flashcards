@@ -217,7 +217,8 @@ input[type="search"]:focus {
 .toolbar {
   display: flex;
   flex-direction: column;
-  margin-bottom: 14px;
+  /* Matches the gap between panels, set on .panel margin-bottom. */
+  margin-bottom: 20px;
 }
 
 /* Label beside the box rather than above it. */
