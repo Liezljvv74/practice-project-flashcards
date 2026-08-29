@@ -320,15 +320,38 @@
 
   /* ---- Typed answer ---- */
 
-  // Forgiving comparison: case, outer spaces, doubled spaces and a
-  // trailing full stop should not fail an otherwise correct answer.
-  function normalize(text) {
-    return text
-      .trim()
+  /* --- answer matching (pure functions, kept together for testing) --- */
+
+  // Punctuation clinging to the outside of a word. Deliberately a fixed
+  // list rather than \W, so accented letters survive: a \W-based strip
+  // would turn "cafe" with an accent into "caf".
+  var EDGE_PUNCTUATION = /^[.,!?;:'"()\[\]{}\-]+|[.,!?;:'"()\[\]{}\-]+$/g;
+
+  // Break text into a sorted list of bare words. Sorting is what makes
+  // word order irrelevant; splitting on /\s+/ makes spacing irrelevant.
+  function answerWords(text) {
+    return String(text)
       .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[.,!?;:]+$/, '');
+      .split(/\s+/)
+      .map(function (word) {
+        return word.replace(EDGE_PUNCTUATION, '');
+      })
+      .filter(function (word) {
+        return word.length > 0;
+      })
+      .sort();
   }
+
+  // Correct when the guess holds exactly the same words as the answer.
+  // Any order, any spacing, any capitals - but every word must be
+  // there, and no extras.
+  function isCorrect(guess, answer) {
+    var typed = answerWords(guess);
+    var wanted = answerWords(answer);
+    return typed.length === wanted.length && typed.join(' ') === wanted.join(' ');
+  }
+
+  /* --- end answer matching --- */
 
   function resetAnswer() {
     review.answerState = 'idle';
@@ -374,7 +397,7 @@
       return;
     }
 
-    if (normalize(guess) === normalize(card.answer)) {
+    if (isCorrect(guess, card.answer)) {
       review.answerState = 'correct';
       review.flipped = true;   // they earned the answer side
       review.correct++;

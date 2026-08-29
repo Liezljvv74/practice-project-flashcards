@@ -414,6 +414,12 @@ input[type="text"]:focus {
   gap: 8px;
 }
 
+.answer-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
 .answer-feedback {
   display: flex;
   flex-direction: column;
