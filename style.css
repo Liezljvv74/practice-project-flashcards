@@ -217,6 +217,56 @@ input[type="search"]:focus {
   font-size: 14px;
 }
 
+/* ---- Auto-create ---- */
+
+.auto-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.auto-hint {
+  flex: 1 1 240px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.auto-outcome {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.auto-outcome[hidden] {
+  display: none;
+}
+
+.auto-result {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auto-result.is-ok {
+  color: var(--known);
+}
+
+.auto-result.is-bad {
+  color: var(--danger);
+}
+
+.auto-result.is-busy {
+  color: var(--ink-soft);
+}
+
 /* ---- Toolbar ---- */
 
 /* Sits on the page background, with no panel around it. */

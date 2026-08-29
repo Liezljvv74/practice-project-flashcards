@@ -53,6 +53,19 @@
       </form>
 
       <p id="add-error" class="error" role="alert" hidden></p>
+
+      <div class="auto-create">
+        <p class="auto-hint">
+          Or build many at once from a .csv, .txt, .md, .docx or .pdf file: two columns a row, question first.
+        </p>
+        <button type="button" id="auto-create" class="btn btn-small">Auto-create from a file</button>
+        <input type="file" id="auto-file" accept=".csv,.txt,.md,.markdown,.tsv,.docx,.pdf" hidden>
+      </div>
+
+      <div id="auto-outcome" class="auto-outcome" hidden>
+        <p id="auto-result" class="auto-result" role="status"></p>
+        <button type="button" id="auto-undo" class="btn btn-small" hidden>Undo</button>
+      </div>
     </section>
 
     <section class="panel" aria-labelledby="deck-heading">
@@ -146,6 +159,11 @@
 
   <!-- Filled in on demand, and only visible when printing. -->
   <div id="print-area" class="print-area"></div>
+
+  <!-- Optional readers for .docx and .pdf, from a CDN. Everything else
+       in the app works without them and without a connection. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <script src="app.js"></script>
 </body>

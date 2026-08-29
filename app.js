@@ -9,6 +9,9 @@
   // How long the green "Correct!" block stays up before the next card.
   var CORRECT_PAUSE_MS = 1000;
 
+  // The most cards one Auto-create run may add.
+  var AUTO_CREATE_LIMIT = 20;
+
   var STATUS_LABEL = {
     new: 'Not reviewed',
     known: 'Known',
@@ -21,6 +24,7 @@
   var editingId = null;   // card currently being edited in place
   var selectedId = null;  // card the keyboard is pointing at
   var searchTerm = '';    // text typed into the search box
+  var lastAutoIds = [];   // ids added by the last Auto-create, for Undo
   // phase:       'choice' | 'card' | 'done'
   // answerState: 'idle' | 'correct' | 'wrong' | 'revealed'
   var review = {
@@ -49,6 +53,10 @@
 
   var searchInput = el('search-input');
   var importFile = el('import-file');
+  var autoFile = el('auto-file');
+  var autoOutcome = el('auto-outcome');
+  var autoResult = el('auto-result');
+  var autoUndo = el('auto-undo');
   var printArea = el('print-area');
 
   var deckCount = el('deck-count');
@@ -397,6 +405,462 @@
     renderDeck();
   });
 
+  /* ---- Auto-create: turn a file into cards ---- */
+
+  /* --- card parsing (pure functions, kept together for testing) --- */
+
+  // A status label read back into the stored value, so a file this app
+  // exported keeps its statuses when it is read in again.
+  var STATUS_FROM_LABEL = {
+    'known': 'known',
+    'still learning': 'learning',
+    'not reviewed': 'new'
+  };
+
+  // One CSV line into fields, honouring quotes and doubled quotes, so a
+  // comma inside a question does not split it into two columns.
+  function parseCsvLine(line) {
+    var fields = [];
+    var current = '';
+    var inQuotes = false;
+    var i;
+
+    for (i = 0; i < line.length; i++) {
+      var ch = line.charAt(i);
+
+      if (inQuotes) {
+        if (ch !== '"') {
+          current += ch;
+        } else if (line.charAt(i + 1) === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        fields.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+
+    fields.push(current);
+    return fields.map(function (field) {
+      return field.trim();
+    });
+  }
+
+  // Markdown furniture: headings, horizontal rules, and the dashed row
+  // under a table header. Not cards, but not mistakes either, so these
+  // are ignored rather than counted as skipped.
+  var MARKDOWN_FURNITURE = /^(#{1,6}\s|={3,}$|-{3,}$|\*{3,}$|_{3,}$|\|?[\s\-:|]+\|?$)/;
+
+  // A bullet or number at the start of a line, so "- term | meaning"
+  // reads as a card rather than a card whose question starts with "-".
+  var LIST_MARKER = /^(\s*[-*+]\s+|\s*\d+[.)]\s+)/;
+
+  // A markdown table row arrives as "| a | b |", which splits into an
+  // empty field at each end. Drop those so the columns line up.
+  function splitOnPipes(line) {
+    var parts = trimAll(line.split('|'));
+    if (parts.length && parts[0] === '') parts.shift();
+    if (parts.length && parts[parts.length - 1] === '') parts.pop();
+    return parts;
+  }
+
+  // Split one line into columns. Tabs and pipes are unambiguous, so
+  // they win; commas need the CSV reader; " - " is tried last because a
+  // bare hyphen turns up inside ordinary words.
+  function splitLine(line) {
+    if (line.indexOf('\t') !== -1) return trimAll(line.split('\t'));
+    if (line.indexOf('|') !== -1) return splitOnPipes(line);
+
+    if (line.indexOf(',') !== -1) {
+      var fields = parseCsvLine(line);
+      if (fields.length >= 2) return fields;
+    }
+
+    var dashed = line.split(' - ');
+    if (dashed.length >= 2) {
+      return [dashed[0].trim(), dashed.slice(1).join(' - ').trim()];
+    }
+
+    return null;
+  }
+
+  function trimAll(parts) {
+    return parts.map(function (part) {
+      return part.trim();
+    });
+  }
+
+  function isHeaderRow(fields) {
+    return fields.length >= 2 &&
+      fields[0].toLowerCase() === 'question' &&
+      fields[1].toLowerCase() === 'answer';
+  }
+
+  function statusFromLabel(label) {
+    var key = label ? String(label).trim().toLowerCase() : '';
+    return STATUS_FROM_LABEL[key] || 'new';
+  }
+
+  // Read a whole file into { cards, skipped }. Cards carry no id yet;
+  // that is added when they join the deck.
+  function parseCards(text) {
+    var lines = String(text).split(/\r\n|\r|\n/);
+    var cards = [];
+    var skipped = 0;
+    var pendingQuestion = null;
+    var seenFirstRow = false;
+
+    lines.forEach(function (rawLine) {
+      var line = rawLine.trim();
+      if (!line) return;                       // blank lines are not failures
+      if (MARKDOWN_FURNITURE.test(line)) return;
+
+      line = line.replace(LIST_MARKER, '');
+      if (!line) return;
+
+      // "A: ..." closes a question opened on an earlier line.
+      var answered = line.match(/^a\s*[:.]\s*(.+)$/i);
+      if (answered) {
+        if (pendingQuestion) {
+          cards.push({
+            question: pendingQuestion,
+            answer: answered[1].trim(),
+            status: 'new'
+          });
+          pendingQuestion = null;
+        } else {
+          skipped++;                           // an answer with no question
+        }
+        return;
+      }
+
+      var asked = line.match(/^q\s*[:.]\s*(.+)$/i);
+      if (asked) {
+        if (pendingQuestion) skipped++;        // the one before was never answered
+        pendingQuestion = asked[1].trim();
+        return;
+      }
+
+      if (pendingQuestion) {                   // a question left hanging
+        skipped++;
+        pendingQuestion = null;
+      }
+
+      var fields = splitLine(line);
+      if (!fields) {
+        skipped++;
+        return;
+      }
+
+      if (!seenFirstRow && isHeaderRow(fields)) {
+        seenFirstRow = true;                   // column titles, not a card
+        return;
+      }
+      seenFirstRow = true;
+
+      var question = fields[0];
+      var answer = fields[1];
+      if (!question || !answer) {
+        skipped++;
+        return;
+      }
+
+      cards.push({
+        question: question,
+        answer: answer,
+        status: statusFromLabel(fields[2])
+      });
+    });
+
+    if (pendingQuestion) skipped++;
+
+    return { cards: cards, skipped: skipped };
+  }
+
+  /* --- end card parsing --- */
+
+  // state is 'ok', 'bad' or 'busy'.
+  function showAutoResult(message, state) {
+    autoResult.textContent = message;
+    autoResult.className = 'auto-result is-' + state;
+    autoOutcome.hidden = false;
+  }
+
+  function showUndo(canUndo) {
+    autoUndo.hidden = !canUndo;
+  }
+
+  function plural(count, word) {
+    return count + ' ' + word + (count === 1 ? '' : 's');
+  }
+
+  function autoCreateFromText(text) {
+    var result = parseCards(text);
+
+    if (!result.cards.length) {
+      showUndo(false);
+      showAutoResult(
+        'No cards found in that file. Each row needs a question and an answer, ' +
+        'separated by a comma, a tab, a pipe or " - ".',
+        'bad'
+      );
+      return;
+    }
+
+    var found = result.cards.length;
+    var taken = result.cards.slice(0, AUTO_CREATE_LIMIT);
+
+    // Remember this batch so Undo can lift exactly these cards back out.
+    lastAutoIds = taken.map(function (card) {
+      var id = makeId();
+      deck.push({
+        id: id,
+        question: card.question,
+        answer: card.answer,
+        status: card.status
+      });
+      return id;
+    });
+
+    // Clear any search, or the new cards may be filtered out of sight.
+    searchTerm = '';
+    searchInput.value = '';
+
+    save();
+    renderDeck();
+
+    var message = 'Added ' + plural(taken.length, 'card') + '.';
+
+    if (found > AUTO_CREATE_LIMIT) {
+      message += ' That file held ' + found + ', and ' + AUTO_CREATE_LIMIT +
+        ' is the most that can be created at once, so the rest were left out.';
+    }
+    if (result.skipped) {
+      message += ' ' + plural(result.skipped, 'line') +
+        ' had no question and answer, so ' +
+        (result.skipped === 1 ? 'it was' : 'they were') + ' skipped.';
+    }
+
+    showUndo(true);
+    showAutoResult(message, 'ok');
+  }
+
+  // Take back exactly the cards the last auto-create added. Any of them
+  // already deleted by hand are simply not there to remove.
+  function undoAutoCreate() {
+    if (!lastAutoIds.length) return;
+
+    var batch = lastAutoIds;
+    var before = deck.length;
+
+    deck = deck.filter(function (card) {
+      return batch.indexOf(card.id) === -1;
+    });
+
+    if (batch.indexOf(selectedId) !== -1) selectedId = null;
+    if (batch.indexOf(editingId) !== -1) editingId = null;
+
+    lastAutoIds = [];
+    save();
+    renderDeck();
+
+    showUndo(false);
+    showAutoResult('Removed the ' + plural(before - deck.length, 'card') +
+      ' that were just created.', 'ok');
+  }
+
+  autoUndo.addEventListener('click', undoAutoCreate);
+
+  el('auto-create').addEventListener('click', function () {
+    autoFile.value = '';   // so picking the same file twice still fires
+    autoFile.click();
+  });
+
+  var PDFJS_VERSION = '3.11.174';
+
+  // Formats with no reader here. Word 97-2003 .doc is an older, wholly
+  // different format from .docx, and no browser library reads it.
+  var UNREADABLE_FORMATS = {
+    doc: 'Word 97-2003', odt: 'OpenDocument', rtf: 'Rich Text',
+    pages: 'Pages', xls: 'Excel', xlsx: 'Excel',
+    ppt: 'PowerPoint', pptx: 'PowerPoint', key: 'Keynote'
+  };
+
+  function extensionOf(name) {
+    var dot = String(name).lastIndexOf('.');
+    return dot === -1 ? '' : String(name).slice(dot + 1).toLowerCase();
+  }
+
+  function readAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('That file could not be opened.')); };
+      reader.readAsText(file);
+    });
+  }
+
+  function readAsArrayBuffer(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('That file could not be opened.')); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function missingReader(what) {
+    return new Error(
+      'The ' + what + ' reader did not load. It comes from the internet rather ' +
+      'than living in this project, so check the connection and reload the page.'
+    );
+  }
+
+  /* ---- PDF ---- */
+
+  // pdf.js hands back positioned text fragments with no line breaks in
+  // them. The parser works a line at a time, so group the fragments by
+  // their vertical position to rebuild the lines.
+  function pdfTextToLines(content) {
+    var lines = [];
+    var current = null;
+    var lastY = null;
+
+    content.items.forEach(function (item) {
+      var y = Math.round(item.transform[5]);
+      if (lastY === null || Math.abs(y - lastY) > 2) {
+        current = [];
+        lines.push(current);
+        lastY = y;
+      }
+      current.push(item.str);
+    });
+
+    return lines.map(function (parts) {
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }).join('\n');
+  }
+
+  function readPdfPage(pdf, number, pages) {
+    return function () {
+      return pdf.getPage(number)
+        .then(function (page) {
+          return page.getTextContent();
+        })
+        .then(function (content) {
+          pages.push(pdfTextToLines(content));
+        });
+    };
+  }
+
+  function readPdf(file) {
+    if (!window.pdfjsLib) return Promise.reject(missingReader('PDF'));
+
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + PDFJS_VERSION + '/pdf.worker.min.js';
+
+    return readAsArrayBuffer(file)
+      .then(function (buffer) {
+        return window.pdfjsLib.getDocument({ data: buffer }).promise;
+      })
+      .then(function (pdf) {
+        var pages = [];
+        var chain = Promise.resolve();
+        var number;
+
+        // One page at a time, so the pages stay in order.
+        for (number = 1; number <= pdf.numPages; number++) {
+          chain = chain.then(readPdfPage(pdf, number, pages));
+        }
+
+        return chain.then(function () {
+          return pages.join('\n');
+        });
+      });
+  }
+
+  /* ---- Word (.docx) ---- */
+
+  // A table is the natural way to write cards in Word, so convert to
+  // HTML and turn each row into "cell | cell". Taking raw text instead
+  // would lose which cell was which and leave every row unusable.
+  function docxHtmlToLines(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var lines = [];
+    var each = Array.prototype.forEach;
+
+    each.call(doc.querySelectorAll('tr'), function (row) {
+      var cells = Array.prototype.map.call(row.querySelectorAll('th, td'), function (cell) {
+        return cell.textContent.trim();
+      });
+      if (cells.length) lines.push(cells.join(' | '));
+    });
+
+    each.call(doc.querySelectorAll('table'), function (table) {
+      table.parentNode.removeChild(table);
+    });
+
+    each.call(doc.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6'), function (node) {
+      var text = node.textContent.trim();
+      if (text) lines.push(text);
+    });
+
+    return lines.join('\n');
+  }
+
+  function readDocx(file) {
+    if (!window.mammoth) return Promise.reject(missingReader('Word'));
+
+    return readAsArrayBuffer(file)
+      .then(function (buffer) {
+        return window.mammoth.convertToHtml({ arrayBuffer: buffer });
+      })
+      .then(function (result) {
+        return docxHtmlToLines(result.value);
+      });
+  }
+
+  function readFileForCards(file) {
+    var extension = extensionOf(file.name);
+
+    if (UNREADABLE_FORMATS[extension]) {
+      return Promise.reject(new Error(
+        'A .' + extension + ' file cannot be read here: ' + UNREADABLE_FORMATS[extension] +
+        ' files are not plain text and there is no reader for them. Open it, choose ' +
+        'Save as, pick Word (.docx), Plain Text (.txt) or CSV, and load that instead.'
+      ));
+    }
+
+    if (extension === 'pdf') return readPdf(file);
+    if (extension === 'docx') return readDocx(file);
+    return readAsText(file);
+  }
+
+  autoFile.addEventListener('change', function () {
+    var file = autoFile.files && autoFile.files[0];
+    if (!file) return;
+
+    showAutoResult('Reading ' + file.name + '...', 'busy');
+
+    readFileForCards(file)
+      .then(function (text) {
+        autoCreateFromText(text);
+      })
+      .catch(function (error) {
+        showAutoResult(
+          error && error.message ? error.message : 'That file could not be read.',
+          'bad'
+        );
+      });
+  });
+
   /* ---- Search ---- */
 
   searchInput.addEventListener('input', function () {
@@ -526,6 +990,8 @@
     deck = imported;
     selectedId = null;
     editingId = null;
+    lastAutoIds = [];      // those cards are gone, so Undo has nothing to lift
+    showUndo(false);
     searchTerm = '';
     searchInput.value = '';
     save();

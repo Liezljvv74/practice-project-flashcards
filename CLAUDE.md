@@ -10,6 +10,10 @@ A small study tool. Users create question/answer cards, then review them one at 
 - localStorage for saving cards
 - GitHub Pages for hosting
 
+Two readers load from a CDN, used only by Auto-create for .docx and
+.pdf files: mammoth and pdf.js. Everything else works offline and
+without them.
+
 ## Files
 
 Keep everything in these three files:
