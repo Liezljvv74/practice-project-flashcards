@@ -213,13 +213,11 @@ input[type="search"]:focus {
 
 /* ---- Toolbar ---- */
 
+/* Sits on the page background, with no panel around it. */
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /* Tighter than a normal panel: it holds one short field. */
-  padding: 14px 20px 16px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .toolbar .field {
