@@ -19,9 +19,11 @@
 
   var deck = [];          // [{ id, question, answer, status }]
   var editingId = null;   // card currently being edited in place
+  // phase:       'choice' | 'card' | 'done'
   // answerState: 'idle' | 'correct' | 'wrong' | 'revealed'
   var review = {
     active: false,
+    phase: 'choice',
     order: [],
     index: 0,
     flipped: false,
@@ -49,6 +51,10 @@
   var startReviewBtn = el('start-review');
 
   var reviewEl = el('review');
+  var reviewChoice = el('review-choice');
+  var chooseAllBtn = el('choose-all');
+  var chooseLearningBtn = el('choose-learning');
+  var choiceNote = el('choice-note');
   var reviewStage = el('review-stage');
   var reviewDone = el('review-done');
   var reviewProgress = el('review-progress');
@@ -301,19 +307,38 @@
     }
   }
 
-  function startReview() {
+  function learningCards() {
+    return deck.filter(function (c) {
+      return c.status === 'learning';
+    });
+  }
+
+  // Opening the overlay only asks what to review. Nothing starts until
+  // one of the two options is chosen.
+  function openReview() {
     if (!deck.length) return;
     clearCorrectTimer();
     review.active = true;
-    review.correct = 0;
-    review.order = deck.map(function (c) {
+    review.phase = 'choice';
+    reviewEl.hidden = false;
+    renderReview();
+  }
+
+  // scope is 'all' or 'learning'.
+  function beginReview(scope) {
+    var cards = scope === 'learning' ? learningCards() : deck;
+    if (!cards.length) return;
+
+    clearCorrectTimer();
+    review.order = cards.map(function (c) {
       return c.id;
     });
     review.index = 0;
     review.flipped = false;
     review.marks = {};
+    review.correct = 0;
+    review.phase = 'card';
     resetAnswer();
-    reviewEl.hidden = false;
     renderReview();
     focusAnswer();
   }
@@ -371,7 +396,7 @@
   }
 
   function focusAnswer() {
-    if (review.active && review.answerState === 'idle' && currentCard()) {
+    if (review.active && review.phase === 'card' && review.answerState === 'idle' && currentCard()) {
       answerGuess.focus();
     }
   }
@@ -427,7 +452,7 @@
 
   function advanceAfterCorrect() {
     correctTimer = null;
-    if (!review.active || review.answerState !== 'correct') return;
+    if (!review.active || review.phase !== 'card' || review.answerState !== 'correct') return;
 
     if (review.index < review.order.length - 1) {
       goTo(review.index + 1);
@@ -462,21 +487,49 @@
   }
 
   function renderReview() {
+    reviewChoice.hidden = review.phase !== 'choice';
+    reviewStage.hidden = review.phase !== 'card';
+    reviewDone.hidden = review.phase !== 'done';
+
+    if (review.phase === 'choice') {
+      renderChoice();
+    } else if (review.phase === 'done') {
+      renderDone();
+    } else {
+      renderCard();
+    }
+  }
+
+  function renderChoice() {
+    var learning = learningCards().length;
+
+    reviewProgress.textContent = '';
+    chooseAllBtn.textContent = 'Review all (' + deck.length + ')';
+    chooseLearningBtn.textContent = 'Review "still learning" only (' + learning + ')';
+    chooseLearningBtn.disabled = learning === 0;
+    choiceNote.textContent = learning === 0
+      ? 'No cards are marked "still learning" yet, so there is nothing to narrow down to.'
+      : learning + ' of ' + deck.length + ' cards are marked "still learning".';
+    chooseAllBtn.focus();
+  }
+
+  function renderDone() {
+    reviewProgress.textContent = 'Done';
+    reviewSummary.textContent =
+      'You answered ' + review.correct + ' correctly. ' +
+      countMarks('known') + ' marked as known, ' +
+      countMarks('learning') + ' as still learning.';
+  }
+
+  function renderCard() {
     var card = currentCard();
 
     if (!card) {
-      reviewStage.hidden = true;
-      reviewDone.hidden = false;
-      reviewProgress.textContent = 'Done';
-      reviewSummary.textContent =
-        'You answered ' + review.correct + ' correctly. ' +
-        countMarks('known') + ' marked as known, ' +
-        countMarks('learning') + ' as still learning.';
+      review.phase = 'done';
+      renderReview();
       return;
     }
 
-    reviewStage.hidden = false;
-    reviewDone.hidden = true;
     reviewProgress.textContent = 'Card ' + (review.index + 1) + ' of ' + review.order.length;
     flashcardSide.textContent = review.flipped ? 'Answer' : 'Question';
     flashcardText.textContent = review.flipped ? card.answer : card.question;
@@ -534,10 +587,17 @@
     focusAnswer();
   }
 
-  startReviewBtn.addEventListener('click', startReview);
+  startReviewBtn.addEventListener('click', openReview);
   el('exit-review').addEventListener('click', exitReview);
   el('review-close').addEventListener('click', exitReview);
-  el('review-again').addEventListener('click', startReview);
+  el('review-again').addEventListener('click', openReview);   // back to the chooser
+
+  chooseAllBtn.addEventListener('click', function () {
+    beginReview('all');
+  });
+  chooseLearningBtn.addEventListener('click', function () {
+    beginReview('learning');
+  });
   el('mark-known').addEventListener('click', function () {
     mark('known');
   });
@@ -565,7 +625,8 @@
     // otherwise Space, K and L could never be part of an answer.
     if (event.target && event.target.tagName === 'INPUT') return;
 
-    if (!reviewDone.hidden) return;
+    // The shortcuts below only make sense while a card is showing.
+    if (review.phase !== 'card') return;
 
     if (event.key === ' ' || event.key === 'Spacebar') {
       // Stops the page scrolling, and stops a focused button firing on space.

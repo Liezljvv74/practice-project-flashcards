@@ -379,6 +379,34 @@ input[type="text"]:focus {
   color: var(--ink-soft);
 }
 
+/* ---- Review scope chooser ---- */
+
+.review-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.review-choice[hidden] {
+  display: none;
+}
+
+.choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.choice-actions .btn {
+  flex: 1 1 220px;
+}
+
+.choice-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
 /* ---- Answer block ---- */
 
 .answer-block {
