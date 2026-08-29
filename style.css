@@ -110,8 +110,14 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  flex: 1 1 220px;
   min-width: 0;
+}
+
+/* Only the add form lays its fields out in a row, so only there does
+   a 220px basis mean a width. In a column container it would be read
+   as a height and leave a tall gap under the input. */
+.add-form .field {
+  flex: 1 1 220px;
 }
 
 label {
