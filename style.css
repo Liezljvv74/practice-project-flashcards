@@ -51,7 +51,22 @@ h2 {
 }
 
 .app-head {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+
+/* Title on the left, file buttons on the right, tops level so the
+   buttons line up with the word Flashcards. */
+.head-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.head-title {
+  flex: 1 1 260px;
+  min-width: 0;
 }
 
 .subtitle {
@@ -207,6 +222,7 @@ input[type="search"]:focus {
 .toolbar-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -573,6 +589,15 @@ input[type="search"]:focus {
   .card-side {
     width: 100%;
     justify-content: space-between;
+  }
+
+  /* Stacked under the title, the file buttons share the width evenly. */
+  .toolbar-actions {
+    width: 100%;
+  }
+
+  .toolbar-actions .btn {
+    flex: 1 1 140px;
   }
 
   .flashcard-text {
