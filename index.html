@@ -11,9 +11,29 @@
   <div class="app">
 
     <header class="app-head">
-      <h1>Flashcards</h1>
-      <p class="subtitle">Write your cards, then review them one at a time.</p>
+      <div class="head-row">
+        <div class="head-title">
+          <h1>Flashcards</h1>
+          <p class="subtitle">Write your cards, then review them one at a time.</p>
+        </div>
+
+        <div class="toolbar-actions" role="group" aria-label="Export, backup and restore">
+          <button type="button" id="export-csv" class="btn btn-small">Export to Excel</button>
+          <button type="button" id="export-pdf" class="btn btn-small">Export to PDF</button>
+          <button type="button" id="export-json" class="btn btn-small">Backup (JSON)</button>
+          <button type="button" id="import-json" class="btn btn-small">Restore from file</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
     </header>
+
+    <section class="toolbar" aria-label="Search">
+      <div class="field">
+        <label for="search-input">Search</label>
+        <input id="search-input" type="search" autocomplete="off"
+               placeholder="Find a card by its question or answer">
+      </div>
+    </section>
 
     <section class="panel" aria-labelledby="add-heading">
       <h2 id="add-heading">Add a card</h2>
@@ -43,6 +63,9 @@
 
       <p id="empty-state" class="empty">No cards yet. Add your first one above.</p>
       <ul id="card-list" class="card-list"></ul>
+      <p id="list-hint" class="list-hint">
+        Click a card to select it, then use the arrow keys to move and Delete to remove.
+      </p>
     </section>
 
   </div>
@@ -56,17 +79,56 @@
         <button type="button" id="exit-review" class="btn btn-quiet">Exit review</button>
       </div>
 
+      <div id="review-choice" class="review-choice">
+        <h2>What would you like to review?</h2>
+        <div class="choice-actions">
+          <button type="button" id="choose-all" class="btn btn-primary">Review all</button>
+          <button type="button" id="choose-pending" class="btn">Review "still learning" and "not reviewed" only</button>
+        </div>
+        <p id="choice-note" class="choice-note"></p>
+      </div>
+
       <div id="review-stage">
-        <div id="flashcard" class="flashcard" role="button" tabindex="0"
-             aria-label="Flashcard. Press space to flip.">
-          <span id="flashcard-side" class="flashcard-side">Question</span>
-          <span id="flashcard-text" class="flashcard-text"></span>
-          <span class="flashcard-hint">Click the card or press Space to flip</span>
+
+        <div class="review-cols">
+
+          <div id="flashcard" class="flashcard" role="button" tabindex="0"
+               aria-label="Flashcard. Press space to flip.">
+            <span id="flashcard-side" class="flashcard-side">Question</span>
+            <span id="flashcard-text" class="flashcard-text"></span>
+            <span class="flashcard-hint">Click the card or press Tab to flip</span>
+          </div>
+
+          <div id="answer-block" class="answer-block">
+            <form id="answer-form" class="answer-form" novalidate>
+              <label for="answer-guess">Your answer</label>
+              <input id="answer-guess" type="text" autocomplete="off"
+                     placeholder="Type the answer">
+              <p class="answer-hint">Capitals, spacing, punctuation and word order do not matter.</p>
+              <button type="submit" class="btn btn-primary">Check</button>
+            </form>
+
+            <div id="answer-feedback" class="answer-feedback" role="status" hidden>
+              <p id="answer-message" class="answer-message"></p>
+              <div id="answer-retry" class="answer-retry" hidden>
+                <button type="button" id="retry-yes" class="btn btn-small">Yes</button>
+                <button type="button" id="retry-show" class="btn btn-small">No, show me the correct answer</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <div class="review-actions">
           <button type="button" id="mark-learning" class="btn btn-learning">Still learning</button>
           <button type="button" id="mark-known" class="btn btn-known">Known</button>
+        </div>
+
+        <div class="review-nav">
+          <button type="button" id="prev-card" class="btn btn-nav"
+                  title="Previous card" aria-label="Previous card">&#8249;</button>
+          <button type="button" id="next-card" class="btn btn-nav"
+                  title="Next card" aria-label="Next card">&#8250;</button>
         </div>
       </div>
 
@@ -81,6 +143,9 @@
 
     </div>
   </div>
+
+  <!-- Filled in on demand, and only visible when printing. -->
+  <div id="print-area" class="print-area"></div>
 
   <script src="app.js"></script>
 </body>

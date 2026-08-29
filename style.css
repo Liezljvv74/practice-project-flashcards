@@ -11,6 +11,10 @@
   --known: #1f7a4d;
   --learning: #9a5b00;
   --danger: #b3261e;
+  --correct: #1f7a4d;
+  --correct-bg: #dcf0e5;
+  --wrong: #b3261e;
+  --wrong-bg: #fbe4e2;
   --radius: 10px;
 }
 
@@ -47,7 +51,22 @@ h2 {
 }
 
 .app-head {
-  margin-bottom: 24px;
+  margin-bottom: 14px;
+}
+
+/* Title on the left, file buttons on the right, tops level so the
+   buttons line up with the word Flashcards. */
+.head-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.head-title {
+  flex: 1 1 260px;
+  min-width: 0;
 }
 
 .subtitle {
@@ -91,8 +110,14 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  flex: 1 1 220px;
   min-width: 0;
+}
+
+/* Only the add form lays its fields out in a row, so only there does
+   a 220px basis mean a width. In a column container it would be read
+   as a height and leave a tall gap under the input. */
+.add-form .field {
+  flex: 1 1 220px;
 }
 
 label {
@@ -101,7 +126,8 @@ label {
   color: var(--ink-soft);
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="search"] {
   width: 100%;
   padding: 10px 12px;
   font-size: 15px;
@@ -112,7 +138,8 @@ input[type="text"] {
   border-radius: 8px;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="search"]:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: var(--accent);
@@ -190,6 +217,39 @@ input[type="text"]:focus {
   font-size: 14px;
 }
 
+/* ---- Toolbar ---- */
+
+/* Sits on the page background, with no panel around it. */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  /* Matches the gap between panels, set on .panel margin-bottom. */
+  margin-bottom: 20px;
+}
+
+/* Label beside the box rather than above it. */
+.toolbar .field {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  max-width: 440px;
+}
+
+.toolbar .field label {
+  flex: 0 0 auto;
+}
+
+.toolbar .field input {
+  flex: 1 1 auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ---- Deck list ---- */
 
 .empty {
@@ -218,6 +278,21 @@ input[type="text"]:focus {
   background: #fbfcfd;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.card.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.list-hint {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.list-hint[hidden] {
+  display: none;
 }
 
 .card-main {
@@ -297,10 +372,20 @@ input[type="text"]:focus {
 
 .review-box {
   width: 100%;
-  max-width: 560px;
+  max-width: 900px;
+  max-height: 100%;
+  overflow-y: auto;
   background: var(--panel);
   border-radius: var(--radius);
   padding: 20px;
+}
+
+/* Flashcard on the left, answer block on the right. */
+.review-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
 }
 
 .review-head {
@@ -365,11 +450,125 @@ input[type="text"]:focus {
   color: var(--ink-soft);
 }
 
+/* ---- Review scope chooser ---- */
+
+.review-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.review-choice[hidden] {
+  display: none;
+}
+
+.choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.choice-actions .btn {
+  flex: 1 1 220px;
+}
+
+.choice-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+/* ---- Answer block ---- */
+
+.answer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: #fbfcfd;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.answer-block.is-correct {
+  background: var(--correct-bg);
+  border-color: var(--correct);
+}
+
+.answer-block.is-wrong {
+  background: var(--wrong-bg);
+  border-color: var(--wrong);
+}
+
+/* These use display:flex, so the plain [hidden] rule needs help. */
+.answer-form[hidden],
+.answer-feedback[hidden],
+.answer-retry[hidden] {
+  display: none;
+}
+
+.answer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.answer-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.answer-message {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.answer-block.is-correct .answer-message {
+  color: var(--correct);
+}
+
+.answer-block.is-wrong .answer-message {
+  color: var(--wrong);
+}
+
+.answer-retry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.answer-retry .btn {
+  background: #fff;
+}
+
 .review-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 16px;
+}
+
+/* Small prev / next arrows, bottom right of the review box. */
+.review-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-nav {
+  width: 42px;
+  padding: 4px 0;
+  font-size: 22px;
+  line-height: 1.1;
 }
 
 .review-actions .btn {
@@ -381,6 +580,17 @@ input[type="text"]:focus {
 }
 
 /* ---- Small screens ---- */
+
+/* Stack the answer block under the card when there is no room beside it. */
+@media (max-width: 720px) {
+  .review-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .flashcard {
+    min-height: 150px;
+  }
+}
 
 @media (max-width: 520px) {
   body {
@@ -405,7 +615,81 @@ input[type="text"]:focus {
     justify-content: space-between;
   }
 
+  /* Stacked under the title, the file buttons share the width evenly. */
+  .toolbar-actions {
+    width: 100%;
+  }
+
+  .toolbar-actions .btn {
+    flex: 1 1 140px;
+  }
+
   .flashcard-text {
     font-size: 19px;
+  }
+
+  .answer-block {
+    padding: 16px;
+  }
+
+  .answer-retry .btn {
+    width: 100%;
+  }
+}
+
+/* ---- Printing, which is also how "Export to PDF" works ---- */
+
+.print-area {
+  display: none;
+}
+
+@media print {
+  body {
+    padding: 0;
+    background: #fff;
+  }
+
+  /* Hide the app itself and show the plain table instead. */
+  .app,
+  .review {
+    display: none !important;
+  }
+
+  .print-area {
+    display: block !important;
+  }
+
+  .print-area h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+
+  .print-area .print-meta {
+    margin: 0 0 16px;
+    font-size: 12px;
+    color: #444;
+  }
+
+  .print-area table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .print-area th,
+  .print-area td {
+    border: 1px solid #999;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-area th {
+    background: #eee;
+  }
+
+  /* Keep rows from being split across two pages. */
+  .print-area tr {
+    page-break-inside: avoid;
   }
 }
