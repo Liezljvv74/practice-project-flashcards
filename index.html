@@ -15,6 +15,22 @@
       <p class="subtitle">Write your cards, then review them one at a time.</p>
     </header>
 
+    <section class="panel toolbar" aria-label="Search and file actions">
+      <div class="field">
+        <label for="search-input">Search</label>
+        <input id="search-input" type="search" autocomplete="off"
+               placeholder="Find a card by its question or answer">
+      </div>
+
+      <div class="toolbar-actions">
+        <button type="button" id="export-csv" class="btn btn-small">Export to Excel</button>
+        <button type="button" id="export-pdf" class="btn btn-small">Export to PDF</button>
+        <button type="button" id="export-json" class="btn btn-small">Backup (JSON)</button>
+        <button type="button" id="import-json" class="btn btn-small">Restore from file</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+    </section>
+
     <section class="panel" aria-labelledby="add-heading">
       <h2 id="add-heading">Add a card</h2>
 
@@ -43,6 +59,9 @@
 
       <p id="empty-state" class="empty">No cards yet. Add your first one above.</p>
       <ul id="card-list" class="card-list"></ul>
+      <p id="list-hint" class="list-hint">
+        Click a card to select it, then use the arrow keys to move and Delete to remove.
+      </p>
     </section>
 
   </div>
@@ -73,7 +92,7 @@
                aria-label="Flashcard. Press space to flip.">
             <span id="flashcard-side" class="flashcard-side">Question</span>
             <span id="flashcard-text" class="flashcard-text"></span>
-            <span class="flashcard-hint">Click the card to flip</span>
+            <span class="flashcard-hint">Click the card or press Tab to flip</span>
           </div>
 
           <div id="answer-block" class="answer-block">
@@ -120,6 +139,9 @@
 
     </div>
   </div>
+
+  <!-- Filled in on demand, and only visible when printing. -->
+  <div id="print-area" class="print-area"></div>
 
   <script src="app.js"></script>
 </body>
