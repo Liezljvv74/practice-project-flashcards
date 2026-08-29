@@ -217,6 +217,13 @@ input[type="search"]:focus {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Tighter than a normal panel: it holds one short field. */
+  padding: 14px 20px 16px;
+  margin-bottom: 16px;
+}
+
+.toolbar .field {
+  max-width: 340px;
 }
 
 .toolbar-actions {
